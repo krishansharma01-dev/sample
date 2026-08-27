@@ -211,28 +211,81 @@ def set_active_data_source():
     data = request.json or {}
     source_id = data.get("sourceId")
 
+    # Transaction sequence: Validate -> Find Target -> Transition State -> Commit
     target_ds = None
     for ds in APP_STATE["data_sources"]:
         if ds["id"] == source_id:
-            ds["status"] = "Active"
             target_ds = ds
+            break
+
+    if not target_ds:
+        return jsonify({
+            "status": "error",
+            "message": f"Validation failed: Data source '{source_id}' does not exist. Active source unchanged."
+        }), 404
+
+    # Validate dataset content integrity before committing transition
+    if "rows" not in target_ds or not isinstance(target_ds["rows"], list):
+        return jsonify({
+            "status": "error",
+            "message": f"Validation failed: Source '{target_ds['name']}' has corrupted or invalid row data."
+        }), 422
+
+    # Execute safe state commit
+    previous_active_id = APP_STATE["active_source_id"]
+    for ds in APP_STATE["data_sources"]:
+        if ds["id"] == source_id:
+            ds["status"] = "Active"
+            ds["lastSynced"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         else:
             ds["status"] = "Previous"
 
-    if target_ds:
-        APP_STATE["active_source_id"] = source_id
-        add_history(
-            "Data Source",
-            "Switched Active Data Source",
-            f"Now using dataset: '{target_ds['name']}' ({target_ds['type']})"
-        )
-        return jsonify({
-            "status": "success",
-            "message": f"Successfully activated '{target_ds['name']}'",
-            "activeSource": target_ds,
-            "dataSources": APP_STATE["data_sources"]
-        })
-    return jsonify({"status": "error", "message": "Data source not found"}), 404
+    APP_STATE["active_source_id"] = source_id
+
+    add_history(
+        "Data Source",
+        "Transactional Dataset Switch",
+        f"Deactivated source '{previous_active_id}', Activated dataset: '{target_ds['name']}' ({target_ds['type']})"
+    )
+
+    return jsonify({
+        "status": "success",
+        "message": f"Data loaded successfully. Switched to '{target_ds['name']}'.",
+        "activeSource": target_ds,
+        "dataSources": APP_STATE["data_sources"]
+    })
+
+@app.route('/api/data-sources/restore', methods=['POST'])
+@cross_origin()
+def restore_data_source():
+    data = request.json or {}
+    source_id = data.get("sourceId")
+
+    target_ds = None
+    for ds in APP_STATE["data_sources"]:
+        if ds["id"] == source_id:
+            target_ds = ds
+            break
+
+    if not target_ds:
+        return jsonify({"status": "error", "message": "Data source unavailable for restore."}), 404
+
+    for ds in APP_STATE["data_sources"]:
+        ds["status"] = "Active" if ds["id"] == source_id else "Previous"
+
+    APP_STATE["active_source_id"] = source_id
+    add_history(
+        "Data Source Restore",
+        "Restored Historical Source",
+        f"Restored dataset '{target_ds['name']}' as active source without data contamination."
+    )
+
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully restored '{target_ds['name']}' as active source.",
+        "activeSource": target_ds,
+        "dataSources": APP_STATE["data_sources"]
+    })
 
 @app.route('/api/data-sources/add-sheet', methods=['POST'])
 @cross_origin()
@@ -277,32 +330,66 @@ def add_google_sheet_source():
 @app.route('/api/data-sources/upload-excel', methods=['POST'])
 @cross_origin()
 def upload_excel_source():
-    filename = request.json.get("filename", "Uploaded_Inventory.xlsx") if request.json else "Uploaded_Inventory.xlsx"
+    data = request.json or {}
+    filename = data.get("filename", "test_sample.xlsx")
+    filepath = os.path.join(PARENT_DIR, filename)
+    if not os.path.exists(filepath):
+        filepath = filename
 
-    new_id = f"ds-{len(APP_STATE['data_sources']) + 1}"
-    preview_sheets = ["Inventory_Master", "Cut_List_Raw", "Summary"]
+    if not os.path.exists(filepath):
+        return jsonify({
+            "status": "error",
+            "message": f"File '{filename}' not found on server."
+        }), 404
 
-    # Pre-parse Excel worksheet headers
-    sample_headers = ["Material Description", "Stock Width", "Quantity", "Expected Waste"]
-    sample_rows = [
-        {"id": 1, "material": "Structural Steel Beam 200", "width": 180, "quantity": 25, "waste_est": "2.0%"},
-        {"id": 2, "material": "Aluminum Bar 50mm", "width": 95, "quantity": 50, "waste_est": "1.4%"},
-        {"id": 3, "material": "Polycarbonate Sheet 10mm", "width": 220, "quantity": 15, "waste_est": "4.1%"}
-    ]
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(filepath, data_only=True)
+        worksheets = wb.sheetnames
+        selected_sheet = data.get("worksheet") or worksheets[0]
+        ws = wb[selected_sheet]
 
-    return jsonify({
-        "status": "success",
-        "filename": filename,
-        "worksheets": preview_sheets,
-        "detectedHeaders": sample_headers,
-        "previewRows": sample_rows,
-        "suggestedMapping": {
-            "material": "Material Description",
-            "width": "Stock Width",
-            "quantity": "Quantity",
-            "waste_est": "Expected Waste"
-        }
-    })
+        headers = []
+        rows = []
+        for r_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
+            if r_idx == 1:
+                headers = [str(c) if c is not None else f"Column_{i+1}" for i, c in enumerate(row)]
+            else:
+                if any(cell is not None for cell in row):
+                    row_dict = {}
+                    for c_idx, cell in enumerate(row):
+                        col_name = headers[c_idx] if c_idx < len(headers) else f"Column_{c_idx+1}"
+                        row_dict[col_name] = cell
+                    rows.append(row_dict)
+
+        mapped_rows = []
+        for idx, r in enumerate(rows, start=1):
+            mat = r.get("Material Description") or r.get("Material") or r.get("material") or f"Item #{idx}"
+            width = r.get("Stock Width") or r.get("Width") or r.get("width") or 100
+            qty = r.get("Quantity") or r.get("Qty") or r.get("quantity") or 10
+            waste = r.get("Waste Est") or r.get("Expected Waste") or r.get("waste_est") or "0.0%"
+            mapped_rows.append({
+                "id": idx,
+                "material": str(mat),
+                "width": float(width) if isinstance(width, (int, float)) else 100,
+                "quantity": int(qty) if isinstance(qty, (int, float)) else 10,
+                "waste_est": str(waste)
+            })
+
+        return jsonify({
+            "status": "success",
+            "filename": filename,
+            "worksheets": worksheets,
+            "selectedWorksheet": selected_sheet,
+            "detectedHeaders": headers,
+            "previewRows": mapped_rows,
+            "rawRowsCount": len(rows)
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to parse Excel file: {str(e)}"
+        }), 500
 
 @app.route('/api/data-sources/map-columns', methods=['POST'])
 @cross_origin()
@@ -345,14 +432,47 @@ def map_excel_columns():
 @cross_origin()
 def get_dashboard():
     active_ds = get_active_data_source()
+    if not active_ds or not active_ds.get("rows"):
+        return jsonify({
+            "status": "success",
+            "hasData": False,
+            "message": "No data available.",
+            "metrics": {
+                "totalItems": 0,
+                "totalQuantity": 0,
+                "calculatedWasteAvg": "0.0%",
+                "activeDataSource": active_ds["name"] if active_ds else "None",
+                "totalSheetsProcessed": len(APP_STATE["data_sources"])
+            },
+            "activeSource": active_ds,
+            "recentHistory": APP_STATE["history"][:5],
+            "projects": APP_STATE["projects"]
+        })
+
+    rows = active_ds["rows"]
+    total_qty = sum(r.get("quantity", 0) for r in rows)
+
+    # Calculate real waste percentage from rows
+    waste_vals = []
+    for r in rows:
+        w_str = str(r.get("waste_est", "0%")).replace("%", "").strip()
+        try:
+            waste_vals.append(float(w_str))
+        except ValueError:
+            pass
+    avg_waste = (sum(waste_vals) / len(waste_vals)) if waste_vals else 0.0
+
     return jsonify({
         "status": "success",
+        "hasData": True,
         "metrics": {
+            "totalItems": len(rows),
+            "totalQuantity": total_qty,
+            "calculatedWasteAvg": f"{avg_waste:.1f}%",
             "totalOptimizationRuns": len([h for h in APP_STATE["history"] if h["type"] == "Optimization"]),
-            "averageWasteReduction": "18.4%",
             "activeProjects": len(APP_STATE["projects"]),
             "connectedServices": sum(1 for c in APP_STATE["connections"].values() if c["status"] == "Connected"),
-            "activeDataSource": active_ds["name"] if active_ds else "None",
+            "activeDataSource": active_ds["name"],
             "totalSheetsProcessed": len(APP_STATE["data_sources"])
         },
         "activeSource": active_ds,
@@ -499,6 +619,14 @@ def ai_chat():
     preview_action = None
     active_ds = get_active_data_source()
 
+    if not active_ds or not active_ds.get("rows"):
+        return jsonify({
+            "status": "success",
+            "response": "Analysis unavailable because required data is missing. Connect a Google Sheet or upload an Excel file to begin analysis.",
+            "toolCalls": [],
+            "previewAction": None
+        })
+
     if "switch" in msg_lower and ("dataset" in msg_lower or "source" in msg_lower or "sheet" in msg_lower or "january" in msg_lower or "february" in msg_lower):
         target = "january" if "january" in msg_lower else "february"
         tool_res = execute_ai_tool("switch_active_data_source", {"name": target})
@@ -512,11 +640,15 @@ def ai_chat():
     elif "optimization" in msg_lower or "result" in msg_lower or "waste" in msg_lower:
         tool_res = execute_ai_tool("get_optimization_results", {})
         tool_calls.append({"tool": "get_optimization_results", "result": tool_res})
+        rows = active_ds.get("rows", [])
+        total_items = len(rows)
+        total_qty = sum(r.get("quantity", 0) for r in rows)
         response_text = (
-            f"Here is your waste optimization status for active source **'{active_ds['name']}'**:\n\n"
-            f"• **Recent Runs:** {len(tool_res['recentOptimizations'])} optimization job(s) logged.\n"
-            f"• **Status:** Optimal material yield algorithm active.\n\n"
-            f"You can view complete 1D & 2D cut patterns on the **Waste Optimiser** tab."
+            f"Here is your real data optimization analysis for source **'{active_ds['name']}'**:\n\n"
+            f"• **Active Inventory Rows:** {total_items}\n"
+            f"• **Total Material Quantity:** {total_qty} units\n"
+            f"• **Recent Runs:** {len(tool_res['recentOptimizations'])} logged jobs.\n\n"
+            f"Run cutting stock models under the **Waste Optimiser** tab for 1D and 2D layouts."
         )
 
     elif "sheet" in msg_lower or "google" in msg_lower or "dataset" in msg_lower or "data" in msg_lower:
@@ -524,36 +656,44 @@ def ai_chat():
         tool_calls.append({"tool": "get_active_dataset", "result": tool_res})
 
         if "update" in msg_lower or "organize" in msg_lower or "change" in msg_lower:
-            preview_changes = [
-                {"id": 1, "data": {"waste_est": "2.1%"}},
-                {"id": 2, "data": {"quantity": 35}}
-            ]
-            preview_action = {
-                "type": "google_sheets_update",
-                "title": f"Update Dataset '{tool_res['name']}'",
-                "description": f"PLAYX-AI proposes updating quantity & waste estimates in '{tool_res['name']}'.",
-                "changes": preview_changes
-            }
-            response_text = (
-                f"PLAYX-AI inspected your active dataset **'{tool_res['name']}'** ({tool_res['type']}).\n\n"
-                f"A safety preview has been generated for the requested dataset modification. Confirm below to execute:"
-            )
+            rows = tool_res.get("rows", [])
+            if not rows:
+                response_text = "Analysis unavailable because required data is missing."
+            else:
+                preview_changes = [
+                    {"id": rows[0]["id"], "data": {"quantity": rows[0].get("quantity", 10) + 5}}
+                ]
+                preview_action = {
+                    "type": "google_sheets_update",
+                    "title": f"Update Dataset '{tool_res['name']}'",
+                    "description": f"PLAYX-AI proposes updating Item '{rows[0]['material']}' quantity in '{tool_res['name']}'.",
+                    "changes": preview_changes
+                }
+                response_text = (
+                    f"PLAYX-AI inspected your active dataset **'{tool_res['name']}'** ({tool_res['type']}).\n\n"
+                    f"A safety preview has been generated for the requested dataset modification. Confirm below to execute:"
+                )
         else:
-            response_text = (
-                f"Active Dataset: **'{tool_res['name']}'** ({tool_res['type']})\n\n"
-                f"**Current Inventory Summary ({tool_res['rowsCount']} items):**\n" +
-                "\n".join([f"• {r['material']}: {r['quantity']} units (Width: {r['width']})" for r in tool_res['rows']])
-            )
+            rows = tool_res.get("rows", [])
+            if not rows:
+                response_text = f"Active Dataset: **'{tool_res['name']}'** has no rows."
+            else:
+                response_text = (
+                    f"Active Dataset: **'{tool_res['name']}'** ({tool_res['type']})\n\n"
+                    f"**Current Inventory Summary ({len(rows)} items):**\n" +
+                    "\n".join([f"• {r['material']}: {r['quantity']} units (Width: {r['width']})" for r in rows])
+                )
 
     else:
+        rows = active_ds.get("rows", [])
         response_text = (
             f"Hello! I am **PLAYX-AI**.\n\n"
-            f"Active Data Source: **'{active_ds['name']}'** ({active_ds['type']})\n\n"
+            f"Active Data Source: **'{active_ds['name']}'** ({len(rows)} real inventory records)\n\n"
             f"PLAYX-AI can assist you with:\n"
             f"1. **Running 1D & 2D waste optimization** algorithms\n"
             f"2. **Switching & managing datasets** (Google Sheets, Excel files)\n"
             f"3. **Inspecting and safe-updating Google Sheets** data\n"
-            f"4. **Analyzing waste reduction performance & metrics**\n\n"
+            f"4. **Analyzing real material utilization & waste metrics**\n\n"
             f"How can PLAYX-AI help with your waste management workflow today?"
         )
 

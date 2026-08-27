@@ -16,36 +16,42 @@
       </div>
     </div>
 
-    <div class="metrics-grid">
+    <div v-if="dashboardData.hasData === false" class="empty-state-card apple-card">
+      <div class="empty-state-content">
+        <h3>No data available.</h3>
+        <p>Connect a Google Sheet or upload an Excel file to begin analysis.</p>
+        <button class="apple-btn apple-btn-primary" @click="$emit('navigate', 'data-sources')">
+          Manage Data Sources
+        </button>
+      </div>
+    </div>
+
+    <div v-else class="metrics-grid">
       <div class="metric-card apple-card">
-        <div class="metric-icon">✂️</div>
         <div class="metric-data">
-          <span class="metric-value">{{ metrics.totalOptimizationRuns || 0 }}</span>
-          <span class="metric-label">Optimization Runs</span>
+          <span class="metric-value text-primary">{{ metrics.calculatedWasteAvg || '0.0%' }}</span>
+          <span class="metric-label">Calculated Waste Avg</span>
         </div>
       </div>
 
       <div class="metric-card apple-card">
-        <div class="metric-icon">📉</div>
         <div class="metric-data">
-          <span class="metric-value">{{ metrics.averageWasteReduction || '18.4%' }}</span>
-          <span class="metric-label">Avg Waste Reduction</span>
+          <span class="metric-value">{{ metrics.totalItems || 0 }}</span>
+          <span class="metric-label">Active Inventory Items</span>
         </div>
       </div>
 
       <div class="metric-card apple-card">
-        <div class="metric-icon">📁</div>
         <div class="metric-data">
-          <span class="metric-value">{{ metrics.activeProjects || 0 }}</span>
-          <span class="metric-label">Active Projects</span>
+          <span class="metric-value">{{ metrics.totalQuantity || 0 }}</span>
+          <span class="metric-label">Total Material Quantity</span>
         </div>
       </div>
 
       <div class="metric-card apple-card">
-        <div class="metric-icon">🔗</div>
         <div class="metric-data">
-          <span class="metric-value">{{ metrics.connectedServices || 0 }} / 4</span>
-          <span class="metric-label">Connected Services</span>
+          <span class="metric-value text-success">{{ metrics.activeDataSource || 'None' }}</span>
+          <span class="metric-label">Active Data Source</span>
         </div>
       </div>
     </div>

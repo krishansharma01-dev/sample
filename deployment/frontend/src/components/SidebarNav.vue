@@ -1,19 +1,7 @@
 <template>
   <aside class="sidebar-container" :class="{ 'mobile-open': isMobileOpen }">
     <div class="sidebar-header">
-      <div class="brand-logo">
-        <div class="logo-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-            <path d="M2 17l10 5 10-5"></path>
-            <path d="M2 12l10 5 10-5"></path>
-          </svg>
-        </div>
-        <div class="brand-info">
-          <span class="brand-title">PLAYX</span>
-          <span class="brand-sub">Waste Optimiser</span>
-        </div>
-      </div>
+      <PlayxLogo variant="full" />
       <button class="mobile-close-btn" @click="$emit('close-mobile')">✕</button>
     </div>
 
@@ -46,7 +34,12 @@
 </template>
 
 <script>
+import PlayxLogo from "./PlayxLogo.vue";
+
 export default {
+  components: {
+    PlayxLogo
+  },
   name: "SidebarNav",
   props: {
     currentTab: {
