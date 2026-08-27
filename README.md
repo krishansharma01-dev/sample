@@ -1,87 +1,94 @@
-# Cutting Stock Problem
-Cutting Stock Problem (CSP) deals with planning the cutting of items (rods / sheets) from given stock items (which are usually of fixed size).
+# PLAYX WASTE OPTIMISER
 
-## New to Cutting Stock Problem? Understand Visually
-<a href="https://www.youtube.com/watch?v=4WXtfO9JB20">
-	<img src="./github/video-thumb.jpg" alt="Video Tutorial on Cutting Stock Problem">
-</a>
+> Intelligent Waste Management & Waste Optimization Platform by **PLAYXCODE**
 
+## Overview
+**PLAYX Waste Optimiser** is an enterprise-grade software application designed to solve 1-Dimensional (1-D) and 2-Dimensional (2-D) Cutting Stock Problems (CSP) while minimizing waste and maximizing material utilization. Powered by **Google OR-Tools**, it features an Apple-inspired SaaS user interface, Google Sheets integration with data-safety validation, Gemini AI Assistant with agentic task execution, and Supabase/Firebase persistent memory capabilities.
 
-This implementation of CSP tries to answer
-> How to minimize number of stock items used while cutting customer order
+---
 
+## Features
+- **Apple-Inspired UI/UX**: Minimalist, glassmorphic, responsive design suitable for Desktop, Tablet, and Mobile devices.
+- **1-D & 2-D Optimization Engine**: High-performance linear programming and constraint solving (preserves Google OR-Tools algorithms).
+- **Google Sheets Integration**: Connect spreadsheets, preview updates, validate operations, and write back results safely (**Preview → Validate → Execute → Verify**).
+- **AI Assistant**: Conversational agent (ChatGPT-style) supporting tool orchestration (`get_dashboard_data`, `get_google_sheets`, `propose_sheet_update`, `get_optimization_results`).
+- **Connection Manager**: Centralized interface to manage credentials for Google Sheets, Gemini API, Supabase, and Firebase with secret masking (`AIza••••••••XYZ`).
+- **Activity & History Audit**: Complete logging of connections, optimizations, and data modifications without exposing credentials.
+- **PLAYXCODE Branding & CTA Card**: Floating footer card with animated glowing button pointing to [https://playxcode.netlify.app](https://playxcode.netlify.app).
 
-while doing so, it also caters
-> How to cut the stock for customer orders so that waste is minimum
+---
 
+## System Architecture
+```text
+Frontend (Vue 3 / Apple UI System)
+        │
+        ▼
+Backend API Server (Flask / Python)
+        │
+   ┌────┴───────────────────────────┬──────────────────────────┐
+   ▼                                ▼                          ▼
+Google OR-Tools               Google Sheets Service      Gemini AI & Agentic Tools
+(1D / 2D Algorithms)          (Data Safety Layer)        (Safe Action Preview)
+```
 
-The OR Tools also helps us in calculating the number of possible solutions for your problem. So in addition, we can also compute
-> In how many ways can we cut given order from fixed size Stock?
-
-
-## Quick Usage
-This is how CSP Tools looks in action. Click [CSP Tool](https://emadehsan.com/csp/) to use it
-<a href="https://emadehsan.com/csp/">
-	<img src="./github/CSP-Tool.PNG" alt="CSP Tool">
-</a>
-
-## Libraries
-* [Google OR-Tools](https://developers.google.com/optimization)
+---
 
 ## Quick Start
-Install [Pipenv](https://pipenv.pypa.io/en/latest/), if not already installed
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+ / npm
+
+### Environment Setup
+
+1. Copy environment variables template:
+   ```sh
+   cp .env.example .env
+   ```
+
+2. Install Python Dependencies:
+   ```sh
+   pip install -r deployment/requirements.txt
+   ```
+
+3. Run Backend API Server:
+   ```sh
+   python3 deployment/server.py
+   ```
+   *The server runs on `http://localhost:5000`.*
+
+4. Build & Run Frontend:
+   ```sh
+   cd deployment/frontend
+   npm install
+   NODE_OPTIONS=--openssl-legacy-provider npm run build
+   ```
+   *To start dev server:*
+   ```sh
+   NODE_OPTIONS=--openssl-legacy-provider npm run serve
+   ```
+
+---
+
+## Testing & Verification
+Run Python test suite:
 ```sh
-$ pip3 install --user pipenv
+python3 -m pytest tests/
 ```
 
-Clone this project and install packages
+Verify frontend production build:
 ```sh
-$ git clone https://github.com/emadehsan/csp
-$ cd csp
-$ pipenv install
-
-# activate env
-$ pipenv shell
+cd deployment/frontend && NODE_OPTIONS=--openssl-legacy-provider npm run build
 ```
 
-## Run
-If you run the `stock_cutter_1d.py` file directly, it runs the example which uses 120 as length of stock Rod and generates some customer rods to cut. You can update these at the end of `stock_cutter_1d.py`.
-```sh
-(csp) $ python csp/stock_cutter_1d.py
-```
+---
 
-Output:
+## Security Guidelines
+- **No Secret Exposure**: Passwords, API keys, and OAuth tokens are never logged or stored in unencrypted client states.
+- **Data Safety Protocol**: Spreadsheet modifications require explicit user preview & confirmation before execution.
 
-```sh
-numRollsUsed 5
-Status: OPTIMAL
-Roll #0: [0.0, [33, 33, 18, 18, 18]]
-Roll #1: [2.9999999999999925, [33, 30, 18, 18, 18]]
-Roll #2: [5.999999999999993, [30, 30, 18, 18, 18]]
-Roll #3: [2.9999999999999987, [33, 33, 33, 18]]
-Roll #4: [21.0, [33, 33, 33]]```
-```
+---
 
-![Graph of Output](./github/graph-1d-b.PNG)
-
-
-### Using input file
-If you want to describe your inputs in a file, [infile.txt](./infile.txt) describes the expected format
-
-```sh
-(csp) $ python3 csp/stock_cutter_1d.py infile.txt
-```
-
-
-## Thinks to keep in mind
-* Works with integers only: IP (Integer Programming) problems working with integers only. If you have some values that have decimal part, you can multiply all of your inputs with some number that will make them integers (or close estimation).
-* You cannot specify units: Whether your input is in Inches or Meters, you have to keep a record of that yourself and conversions if any.
-
-
-## CSP 2D
-Code for 2-dimensional Cutting Stock Problem is in [`deployment/stock_cutter.py`](deployment/stock_cutter.py) file. The `deployment` directory also contains code for the API server and deploying it on Heroku.
-
-## Resources
-The whole code for this project is taken from Serge Kruk's
-* [Practical Python AI Projects: Mathematical Models of Optimization Problems with Google OR-Tools](https://amzn.to/3iPceJD)
-* [Repository of the code in Serge's book](https://github.com/sgkruk/Apress-AI/)
+## Creator Branding
+- **Developed by**: PLAYXCODE
+- **Website**: [https://playxcode.netlify.app](https://playxcode.netlify.app)
