@@ -2,6 +2,10 @@
   <div class="csp-tool-container apple-card">
     <div class="tool-header">
       <div class="header-titles">
+        <div class="active-ds-tag">
+          <span class="active-dot">🟢</span>
+          <span>Optimizing Active Source: <strong>{{ activeSourceName }}</strong></span>
+        </div>
         <h2>Stock Cuts Waste Planner</h2>
         <p class="subtitle">Plan 1-D & 2-D stock cutting to minimize waste with Google OR-Tools engine.</p>
       </div>
@@ -176,6 +180,7 @@
 <script>
 import * as d3 from "d3";
 import axios from "axios";
+import { API_BASE } from "../apiConfig";
 
 export default {
   name: "CspTool",
@@ -187,6 +192,7 @@ export default {
       mode: "1d",
       cutStyle: "exactCuts",
       cutButtonDisabled: false,
+      activeSourceName: "Default",
 
       mode1d: {
         childs: [{ width: "33", quantity: "5" }, { width: "18", quantity: "4" }],
@@ -224,8 +230,26 @@ export default {
   },
   beforeMount() {
     this.setMode("1d");
+    this.fetchActiveSource();
   },
   methods: {
+    async fetchActiveSource() {
+      try {
+        const res = await axios.get(`${API_BASE}/api/data-sources`);
+        if (res.data && res.data.activeSource) {
+          this.activeSourceName = res.data.activeSource.name;
+          // Pre-fill inputs from active source rows if available
+          if (res.data.activeSource.rows && res.data.activeSource.rows.length > 0) {
+            this.mode1d.childs = res.data.activeSource.rows.map(r => ({
+              width: String(r.width || 33),
+              quantity: String(r.quantity || 5)
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load active dataset for optimizer", e);
+      }
+    },
     setMode(newMode) {
       this.mode = newMode;
       if (newMode === "1d") {
@@ -334,7 +358,7 @@ export default {
       return { child_rects: newChilds, parent_rects: newParents };
     },
     sendReq() {
-      const url = this.mode === "1d" ? "http://localhost:5000/stocks_1d" : "http://localhost:5000/stocks_2d";
+      const url = this.mode === "1d" ? `${API_BASE}/stocks_1d` : `${API_BASE}/stocks_2d`;
       this.cutButtonDisabled = true;
       const payload = this.mode === "1d" ? this.prepareDataToSend1D() : this.prepareDataToSend2D();
 
@@ -519,6 +543,15 @@ export default {
   gap: 20px;
 }
 
+.active-ds-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #86868b;
+  margin-bottom: 4px;
+}
+
 .tool-header {
   display: flex;
   align-items: center;
@@ -675,7 +708,7 @@ export default {
   background: rgba(0, 0, 0, 0.02);
   border-radius: 12px;
   padding: 10px;
-  box-sizing: border-border-box;
+  box-sizing: border-box;
 }
 
 .cut-details {

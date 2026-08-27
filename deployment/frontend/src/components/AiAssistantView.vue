@@ -72,6 +72,7 @@
 
 <script>
 import axios from 'axios';
+import { API_BASE } from "../apiConfig";
 
 export default {
   name: "AiAssistantView",
@@ -104,7 +105,7 @@ export default {
       this.loading = true;
 
       try {
-        const res = await axios.post("http://localhost:5000/api/ai/chat", {
+        const res = await axios.post(`${API_BASE}/api/ai/chat`, {
           message: userText
         });
         if (res.data && res.data.response) {
@@ -127,7 +128,7 @@ export default {
     async confirmAction(action) {
       this.loading = true;
       try {
-        const res = await axios.post("http://localhost:5000/api/google-sheets", {
+        const res = await axios.post(`${API_BASE}/api/google-sheets`, {
           action: "execute_update",
           changes: action.changes
         });

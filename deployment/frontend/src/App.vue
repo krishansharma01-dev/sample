@@ -37,23 +37,14 @@
 
           <CspTool v-else-if="currentTab === 'optimiser'" :key="'optimiser'" />
 
+          <DataSourcesView v-else-if="currentTab === 'data-sources'" :key="'data-sources'" />
+
           <GenericModuleView
             v-else-if="currentTab === 'projects'"
             :key="'projects'"
             title="Projects / Operations"
             subtitle="Manage active production batches and cutting operations."
             :items="dashboardData.projects"
-          />
-
-          <GenericModuleView
-            v-else-if="currentTab === 'data'"
-            :key="'data'"
-            title="Data Center"
-            subtitle="Raw material specifications, master dimensions, and inventory logs."
-            :items="[
-              { title: 'Aluminum 6061 Stock List', details: '150 items in inventory' },
-              { title: 'Steel Pipe Batch #22', details: '95 items in inventory' }
-            ]"
           />
 
           <GoogleSheetsView v-else-if="currentTab === 'sheets'" :key="'sheets'" />
@@ -88,9 +79,11 @@
 
 <script>
 import axios from "axios";
+import { API_BASE } from "./apiConfig";
 import SidebarNav from "./components/SidebarNav.vue";
 import DashboardView from "./components/DashboardView.vue";
 import CspTool from "./components/CspTool.vue";
+import DataSourcesView from "./components/DataSourcesView.vue";
 import GoogleSheetsView from "./components/GoogleSheetsView.vue";
 import AiAssistantView from "./components/AiAssistantView.vue";
 import SettingsView from "./components/SettingsView.vue";
@@ -102,6 +95,7 @@ export default {
     SidebarNav,
     DashboardView,
     CspTool,
+    DataSourcesView,
     GoogleSheetsView,
     AiAssistantView,
     SettingsView,
@@ -119,8 +113,8 @@ export default {
       const titles = {
         dashboard: "Dashboard",
         optimiser: "Waste Optimiser",
+        "data-sources": "Data Sources",
         projects: "Projects / Operations",
-        data: "Data Center",
         sheets: "Google Sheets",
         "ai-assistant": "PLAYX-AI Assistant",
         reports: "Reports",
@@ -136,7 +130,7 @@ export default {
   methods: {
     async fetchDashboardData() {
       try {
-        const res = await axios.get("http://localhost:5000/api/dashboard");
+        const res = await axios.get(`${API_BASE}/api/dashboard`);
         if (res.data) {
           this.dashboardData = res.data;
         }
@@ -145,7 +139,6 @@ export default {
       }
     },
     preventContextMenu(e) {
-      // Client-side light right-click context menu deterrence
       e.preventDefault();
     }
   }
@@ -222,7 +215,6 @@ export default {
   flex: 1;
 }
 
-/* Page Transition Animations */
 .page-fade-enter-active,
 .page-fade-leave-active {
   transition: opacity 0.25s ease, transform 0.25s ease;

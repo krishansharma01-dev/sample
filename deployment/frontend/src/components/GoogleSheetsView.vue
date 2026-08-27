@@ -3,24 +3,22 @@
     <div class="view-header">
       <div>
         <h2>Google Sheets Integration</h2>
-        <p class="subtitle">Direct spreadsheet integration with safety validation layer.</p>
+        <p class="subtitle">Multi-spreadsheet integration with safety validation and dataset isolation.</p>
       </div>
-      <span class="badge-status" :class="sheetsData ? 'badge-success' : 'badge-neutral'">
-        {{ sheetsData ? 'Connected' : 'Not Connected' }}
+      <span class="badge-status" :class="activeSource ? 'badge-success' : 'badge-neutral'">
+        {{ activeSource ? 'Connected' : 'Not Connected' }}
       </span>
     </div>
 
-    <div v-if="sheetsData" class="sheets-content">
+    <div v-if="activeSource" class="sheets-content">
       <div class="sheet-info-bar apple-card">
         <div class="info-item">
-          <span class="label">Spreadsheet:</span>
-          <span class="val">📊 {{ sheetsData.spreadsheet }}</span>
+          <span class="label">Active Dataset:</span>
+          <span class="val">📊 {{ activeSource.name }} ({{ activeSource.type }})</span>
         </div>
         <div class="info-item">
           <span class="label">Worksheet:</span>
-          <select class="apple-input select-sm" v-model="sheetsData.activeWorksheet">
-            <option v-for="ws in sheetsData.worksheets" :key="ws" :value="ws">{{ ws }}</option>
-          </select>
+          <span class="val font-weight-600">{{ activeSource.worksheet }}</span>
         </div>
         <button class="apple-btn apple-btn-primary btn-sm" @click="addRow">+ Add Inventory Row</button>
       </div>
@@ -37,7 +35,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in sheetsData.rows" :key="row.id">
+            <tr v-for="row in activeSource.rows" :key="row.id">
               <td>{{ row.id }}</td>
               <td class="font-weight-600">{{ row.material }}</td>
               <td>{{ row.width }} units</td>
@@ -53,12 +51,13 @@
 
 <script>
 import axios from 'axios';
+import { API_BASE } from "../apiConfig";
 
 export default {
   name: "GoogleSheetsView",
   data() {
     return {
-      sheetsData: null
+      activeSource: null
     };
   },
   mounted() {
@@ -67,23 +66,25 @@ export default {
   methods: {
     async fetchData() {
       try {
-        const res = await axios.get("http://localhost:5000/api/google-sheets");
-        if (res.data && res.data.data) {
-          this.sheetsData = res.data.data;
+        const res = await axios.get(`${API_BASE}/api/data-sources`);
+        if (res.data && res.data.activeSource) {
+          this.activeSource = res.data.activeSource;
         }
       } catch (e) {
-        console.error("Failed to fetch Google Sheets data", e);
+        console.error("Failed to fetch Google Sheets active source", e);
       }
     },
     async addRow() {
       const mat = prompt("Enter Material Name:", "Aluminum Sheet 7075");
       if (!mat) return;
       try {
-        const res = await axios.post("http://localhost:5000/api/google-sheets", {
+        const res = await axios.post(`${API_BASE}/api/google-sheets`, {
           action: "add_row",
           row: { material: mat, width: 150, quantity: 20, waste_est: "2.5%" }
         });
-        this.sheetsData = res.data.data;
+        if (res.data && res.data.data) {
+          this.activeSource = res.data.data;
+        }
       } catch (e) {
         alert("Failed to add row.");
       }
@@ -142,11 +143,6 @@ export default {
 .val {
   font-weight: 600;
   font-size: 0.9rem;
-}
-
-.select-sm {
-  width: 180px;
-  padding: 6px 10px;
 }
 
 .table-card {

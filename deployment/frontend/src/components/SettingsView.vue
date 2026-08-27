@@ -109,6 +109,7 @@
 
 <script>
 import axios from 'axios';
+import { API_BASE } from "../apiConfig";
 
 export default {
   name: "SettingsView",
@@ -127,7 +128,7 @@ export default {
   methods: {
     async fetchData() {
       try {
-        const res = await axios.get("http://localhost:5000/api/connections");
+        const res = await axios.get(`${API_BASE}/api/connections`);
         if (res.data && res.data.connections) {
           this.connections = res.data.connections;
         }
@@ -138,7 +139,7 @@ export default {
     async toggleConnection(service) {
       const isConn = this.connections[service]?.status === 'Connected';
       try {
-        const res = await axios.post("http://localhost:5000/api/connections", {
+        const res = await axios.post(`${API_BASE}/api/connections`, {
           service,
           payload: { action: isConn ? 'disconnect' : 'connect' }
         });
@@ -150,7 +151,7 @@ export default {
     async saveKey(service, key) {
       if (!key) return;
       try {
-        const res = await axios.post("http://localhost:5000/api/connections", {
+        const res = await axios.post(`${API_BASE}/api/connections`, {
           service,
           payload: { apiKey: key, action: 'connect' }
         });

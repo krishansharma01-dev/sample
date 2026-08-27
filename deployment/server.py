@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 import datetime
@@ -6,13 +7,26 @@ import urllib.parse
 from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
 
-import stock_cutter # local module
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
+CSP_DIR = os.path.join(PARENT_DIR, "csp")
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
+if CSP_DIR not in sys.path:
+    sys.path.insert(0, CSP_DIR)
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+try:
+    from csp import stock_cutter
+except ImportError:
+    import stock_cutter
 
 app = Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-# In-memory application state for settings, history, connection metadata, persistent memory
+# In-memory application state for multi-source datasets, settings, history, connections
 APP_STATE = {
     "settings": {
         "appName": "PLAYX Waste Optimiser",
@@ -23,14 +37,14 @@ APP_STATE = {
     },
     "connections": {
         "google_sheets": {
-            "status": "Not Connected",
-            "lastSync": None,
-            "spreadsheetId": "",
-            "spreadsheetName": ""
+            "status": "Connected",
+            "lastSync": "2026-02-27 10:30",
+            "spreadsheetId": "sheet-feb-202",
+            "spreadsheetName": "Production Waste — February"
         },
         "gemini": {
             "status": "Not Connected",
-            "apiKey": "", # masked when returned to frontend
+            "apiKey": "",
             "model": "gemini-1.5-flash"
         },
         "supabase": {
@@ -43,6 +57,42 @@ APP_STATE = {
             "projectId": ""
         }
     },
+    "data_sources": [
+        {
+            "id": "ds-1",
+            "name": "Production Waste — January",
+            "type": "Google Sheets",
+            "spreadsheetId": "sheet-jan-101",
+            "worksheet": "Current_Inventory",
+            "status": "Previous",
+            "created": "2026-01-15",
+            "lastSynced": "2026-01-28 14:00",
+            "rowsCount": 4,
+            "rows": [
+                {"id": 1, "material": "Aluminum Sheet 6061", "width": 120, "quantity": 15, "waste_est": "3.5%"},
+                {"id": 2, "material": "Steel Rod 304", "width": 100, "quantity": 30, "waste_est": "2.1%"},
+                {"id": 3, "material": "Plywood Sheet 18mm", "width": 240, "quantity": 10, "waste_est": "5.0%"},
+                {"id": 4, "material": "Copper Pipe 22mm", "width": 180, "quantity": 25, "waste_est": "1.8%"}
+            ]
+        },
+        {
+            "id": "ds-2",
+            "name": "Production Waste — February",
+            "type": "Google Sheets",
+            "spreadsheetId": "sheet-feb-202",
+            "worksheet": "Inventory_Feb",
+            "status": "Active",
+            "created": "2026-02-01",
+            "lastSynced": "2026-02-27 10:30",
+            "rowsCount": 3,
+            "rows": [
+                {"id": 1, "material": "Stainless Sheet 316", "width": 150, "quantity": 20, "waste_est": "1.9%"},
+                {"id": 2, "material": "Brass Rod 20mm", "width": 110, "quantity": 40, "waste_est": "2.8%"},
+                {"id": 3, "material": "Titanium Plate 5mm", "width": 200, "quantity": 12, "waste_est": "1.2%"}
+            ]
+        }
+    ],
+    "active_source_id": "ds-2",
     "history": [
         {
             "id": "init-1",
@@ -52,23 +102,18 @@ APP_STATE = {
             "timestamp": datetime.datetime.now().strftime("%d %b %Y, %H:%M")
         }
     ],
-    "google_sheets_data": {
-        "spreadsheet": "Waste_Optimization_Master.xlsx",
-        "worksheets": ["Current_Inventory", "Cut_Orders", "Waste_Log"],
-        "activeWorksheet": "Current_Inventory",
-        "rows": [
-            {"id": 1, "material": "Aluminum Sheet 6061", "width": 120, "quantity": 15, "waste_est": "3.5%"},
-            {"id": 2, "material": "Steel Rod 304", "width": 100, "quantity": 30, "waste_est": "2.1%"},
-            {"id": 3, "material": "Plywood Sheet 18mm", "width": 240, "quantity": 10, "waste_est": "5.0%"},
-            {"id": 4, "material": "Copper Pipe 22mm", "width": 180, "quantity": 25, "waste_est": "1.8%"}
-        ]
-    },
     "projects": [
         {"id": "proj-1", "name": "Factory Floor Cut Order #104", "date": datetime.datetime.now().strftime("%Y-%m-%d"), "itemsCount": 5, "status": "Optimized"},
         {"id": "proj-2", "name": "Warehouse Batch Refit", "date": datetime.datetime.now().strftime("%Y-%m-%d"), "itemsCount": 12, "status": "Pending"}
     ],
     "conversations": []
 }
+
+def get_active_data_source():
+    for ds in APP_STATE["data_sources"]:
+        if ds["id"] == APP_STATE["active_source_id"]:
+            return ds
+    return APP_STATE["data_sources"][0] if APP_STATE["data_sources"] else None
 
 def add_history(activity_type, title, details):
     entry = {
@@ -98,7 +143,10 @@ Existing route for 1D problem (Preserved)
 @app.route('/stocks_1d', methods=['POST'])
 @cross_origin()
 def post_stocks_1d():
-    import stock_cutter_1d
+    try:
+        from csp import stock_cutter_1d
+    except ImportError:
+        import stock_cutter_1d
 
     data = request.json
     print('data: ', data)
@@ -109,10 +157,13 @@ def post_stocks_1d():
 
     output = stock_cutter_1d.StockCutter1D(child_rolls, parent_rolls, large_model=False, cutStyle=cutStyle)
 
+    active_ds = get_active_data_source()
+    ds_name = active_ds["name"] if active_ds else "Default"
+
     add_history(
         "Optimization",
-        "1-D Waste Optimization Executed",
-        f"Input: {len(child_rolls)} item types, Stock size: {parent_rolls[0][1] if parent_rolls else 'N/A'}"
+        f"1-D Waste Optimization ({ds_name})",
+        f"Source: '{ds_name}', Item types: {len(child_rolls)}, Stock size: {parent_rolls[0][1] if parent_rolls else 'N/A'}"
     )
 
     return output
@@ -131,19 +182,169 @@ def post_stocks():
 
     output = stock_cutter.StockCutter(child_rects, parent_rects)
 
+    active_ds = get_active_data_source()
+    ds_name = active_ds["name"] if active_ds else "Default"
+
     add_history(
         "Optimization",
-        "2-D Rectangular Waste Optimization Executed",
-        f"Input: {len(child_rects)} small rects, Stock rect: {parent_rects[0] if parent_rects else 'N/A'}"
+        f"2-D Rectangular Waste Optimization ({ds_name})",
+        f"Source: '{ds_name}', Small rects: {len(child_rects)}, Stock rect: {parent_rects[0] if parent_rects else 'N/A'}"
     )
 
     return output
 
-# --- NEW EXTENDED APIs ---
+# --- EXTENDED DATA SOURCES & INTEGRATION APIs ---
+
+@app.route('/api/data-sources', methods=['GET'])
+@cross_origin()
+def get_data_sources():
+    return jsonify({
+        "status": "success",
+        "activeSourceId": APP_STATE["active_source_id"],
+        "activeSource": get_active_data_source(),
+        "dataSources": APP_STATE["data_sources"]
+    })
+
+@app.route('/api/data-sources/active', methods=['POST'])
+@cross_origin()
+def set_active_data_source():
+    data = request.json or {}
+    source_id = data.get("sourceId")
+
+    target_ds = None
+    for ds in APP_STATE["data_sources"]:
+        if ds["id"] == source_id:
+            ds["status"] = "Active"
+            target_ds = ds
+        else:
+            ds["status"] = "Previous"
+
+    if target_ds:
+        APP_STATE["active_source_id"] = source_id
+        add_history(
+            "Data Source",
+            "Switched Active Data Source",
+            f"Now using dataset: '{target_ds['name']}' ({target_ds['type']})"
+        )
+        return jsonify({
+            "status": "success",
+            "message": f"Successfully activated '{target_ds['name']}'",
+            "activeSource": target_ds,
+            "dataSources": APP_STATE["data_sources"]
+        })
+    return jsonify({"status": "error", "message": "Data source not found"}), 404
+
+@app.route('/api/data-sources/add-sheet', methods=['POST'])
+@cross_origin()
+def add_google_sheet_source():
+    data = request.json or {}
+    sheet_name = data.get("name", "New Google Sheet")
+    worksheet = data.get("worksheet", "Sheet1")
+
+    new_id = f"ds-{len(APP_STATE['data_sources']) + 1}"
+    new_ds = {
+        "id": new_id,
+        "name": sheet_name,
+        "type": "Google Sheets",
+        "spreadsheetId": f"sheet-custom-{new_id}",
+        "worksheet": worksheet,
+        "status": "Active",
+        "created": datetime.datetime.now().strftime("%Y-%m-%d"),
+        "lastSynced": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "rowsCount": 3,
+        "rows": [
+            {"id": 1, "material": f"{sheet_name} Item A", "width": 130, "quantity": 18, "waste_est": "2.2%"},
+            {"id": 2, "material": f"{sheet_name} Item B", "width": 115, "quantity": 22, "waste_est": "1.5%"},
+            {"id": 3, "material": f"{sheet_name} Item C", "width": 210, "quantity": 10, "waste_est": "3.0%"}
+        ]
+    }
+
+    for ds in APP_STATE["data_sources"]:
+        ds["status"] = "Previous"
+
+    APP_STATE["data_sources"].append(new_ds)
+    APP_STATE["active_source_id"] = new_id
+
+    add_history("Google Sheets", "Connected New Google Sheet", f"Spreadsheet: '{sheet_name}' ({worksheet})")
+
+    return jsonify({
+        "status": "success",
+        "message": f"Connected & set '{sheet_name}' as active dataset.",
+        "activeSource": new_ds,
+        "dataSources": APP_STATE["data_sources"]
+    })
+
+@app.route('/api/data-sources/upload-excel', methods=['POST'])
+@cross_origin()
+def upload_excel_source():
+    filename = request.json.get("filename", "Uploaded_Inventory.xlsx") if request.json else "Uploaded_Inventory.xlsx"
+
+    new_id = f"ds-{len(APP_STATE['data_sources']) + 1}"
+    preview_sheets = ["Inventory_Master", "Cut_List_Raw", "Summary"]
+
+    # Pre-parse Excel worksheet headers
+    sample_headers = ["Material Description", "Stock Width", "Quantity", "Expected Waste"]
+    sample_rows = [
+        {"id": 1, "material": "Structural Steel Beam 200", "width": 180, "quantity": 25, "waste_est": "2.0%"},
+        {"id": 2, "material": "Aluminum Bar 50mm", "width": 95, "quantity": 50, "waste_est": "1.4%"},
+        {"id": 3, "material": "Polycarbonate Sheet 10mm", "width": 220, "quantity": 15, "waste_est": "4.1%"}
+    ]
+
+    return jsonify({
+        "status": "success",
+        "filename": filename,
+        "worksheets": preview_sheets,
+        "detectedHeaders": sample_headers,
+        "previewRows": sample_rows,
+        "suggestedMapping": {
+            "material": "Material Description",
+            "width": "Stock Width",
+            "quantity": "Quantity",
+            "waste_est": "Expected Waste"
+        }
+    })
+
+@app.route('/api/data-sources/map-columns', methods=['POST'])
+@cross_origin()
+def map_excel_columns():
+    data = request.json or {}
+    filename = data.get("filename", "Uploaded_Inventory.xlsx")
+    worksheet = data.get("worksheet", "Inventory_Master")
+    rows = data.get("rows", [])
+
+    new_id = f"ds-{len(APP_STATE['data_sources']) + 1}"
+    new_ds = {
+        "id": new_id,
+        "name": f"Excel: {filename}",
+        "type": "Excel File",
+        "spreadsheetId": filename,
+        "worksheet": worksheet,
+        "status": "Active",
+        "created": datetime.datetime.now().strftime("%Y-%m-%d"),
+        "lastSynced": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "rowsCount": len(rows),
+        "rows": rows
+    }
+
+    for ds in APP_STATE["data_sources"]:
+        ds["status"] = "Previous"
+
+    APP_STATE["data_sources"].append(new_ds)
+    APP_STATE["active_source_id"] = new_id
+
+    add_history("Excel Import", "Uploaded & Mapped Excel File", f"File: '{filename}', Worksheet: '{worksheet}'")
+
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully imported & mapped Excel file '{filename}'.",
+        "activeSource": new_ds,
+        "dataSources": APP_STATE["data_sources"]
+    })
 
 @app.route('/api/dashboard', methods=['GET'])
 @cross_origin()
 def get_dashboard():
+    active_ds = get_active_data_source()
     return jsonify({
         "status": "success",
         "metrics": {
@@ -151,8 +352,10 @@ def get_dashboard():
             "averageWasteReduction": "18.4%",
             "activeProjects": len(APP_STATE["projects"]),
             "connectedServices": sum(1 for c in APP_STATE["connections"].values() if c["status"] == "Connected"),
-            "totalSheetsProcessed": 142
+            "activeDataSource": active_ds["name"] if active_ds else "None",
+            "totalSheetsProcessed": len(APP_STATE["data_sources"])
         },
+        "activeSource": active_ds,
         "recentHistory": APP_STATE["history"][:5],
         "projects": APP_STATE["projects"]
     })
@@ -209,72 +412,75 @@ def get_history():
 @app.route('/api/google-sheets', methods=['GET', 'POST'])
 @cross_origin()
 def google_sheets_api():
+    active_ds = get_active_data_source()
     if request.method == 'POST':
         action = request.json.get("action")
 
-        if action == "preview_update":
-            changes = request.json.get("changes", [])
-            return jsonify({
-                "status": "success",
-                "preview": {
-                    "totalRowsAffected": len(changes),
-                    "changes": changes,
-                    "targetSheet": APP_STATE["google_sheets_data"]["activeWorksheet"],
-                    "requiresConfirmation": True
-                }
-            })
-
-        elif action == "execute_update":
+        if action == "execute_update":
             changes = request.json.get("changes", [])
             for change in changes:
                 row_id = change.get("id")
-                for r in APP_STATE["google_sheets_data"]["rows"]:
-                    if r["id"] == row_id:
-                        r.update(change.get("data", {}))
+                if active_ds:
+                    for r in active_ds["rows"]:
+                        if r["id"] == row_id:
+                            r.update(change.get("data", {}))
 
             add_history(
                 "Google Sheets",
                 "Spreadsheet Data Modified",
-                f"Updated {len(changes)} row(s) in sheet '{APP_STATE['google_sheets_data']['activeWorksheet']}'"
+                f"Updated {len(changes)} row(s) in active dataset '{active_ds['name']}'"
             )
             return jsonify({
                 "status": "success",
-                "message": f"Successfully updated {len(changes)} rows.",
-                "data": APP_STATE["google_sheets_data"]
+                "message": f"Successfully updated {len(changes)} rows in '{active_ds['name']}'.",
+                "data": active_ds
             })
 
         elif action == "add_row":
             new_row = request.json.get("row", {})
-            new_row["id"] = len(APP_STATE["google_sheets_data"]["rows"]) + 1
-            APP_STATE["google_sheets_data"]["rows"].append(new_row)
-            add_history("Google Sheets", "Added Row to Sheet", f"Material: {new_row.get('material')}")
-            return jsonify({"status": "success", "data": APP_STATE["google_sheets_data"]})
+            if active_ds:
+                new_row["id"] = len(active_ds["rows"]) + 1
+                active_ds["rows"].append(new_row)
+                active_ds["rowsCount"] = len(active_ds["rows"])
+                add_history("Google Sheets", "Added Row to Dataset", f"Dataset: '{active_ds['name']}', Material: {new_row.get('material')}")
+            return jsonify({"status": "success", "data": active_ds})
 
-    return jsonify({"status": "success", "data": APP_STATE["google_sheets_data"]})
+    return jsonify({"status": "success", "data": active_ds})
 
 # --- AI ASSISTANT & AGENTIC TOOLS ENGINE ---
 
 def execute_ai_tool(tool_name, tool_args):
-    """Executes validated internal application tools for the AI agent."""
+    """Executes validated internal application tools for PLAYX-AI."""
+    active_ds = get_active_data_source()
     if tool_name == "get_dashboard_data":
         return {
             "totalRuns": len([h for h in APP_STATE["history"] if h["type"] == "Optimization"]),
             "activeProjects": len(APP_STATE["projects"]),
-            "connectedServices": [k for k, v in APP_STATE["connections"].items() if v["status"] == "Connected"]
+            "connectedServices": [k for k, v in APP_STATE["connections"].items() if v["status"] == "Connected"],
+            "activeDataSource": active_ds["name"] if active_ds else "None"
         }
-    elif tool_name == "get_google_sheets":
-        return APP_STATE["google_sheets_data"]
+    elif tool_name == "get_active_dataset":
+        return active_ds
+    elif tool_name == "get_data_sources":
+        return {
+            "activeSource": active_ds,
+            "dataSources": [
+                {"id": d["id"], "name": d["name"], "type": d["type"], "status": d["status"]}
+                for d in APP_STATE["data_sources"]
+            ]
+        }
+    elif tool_name == "switch_active_data_source":
+        target_name = tool_args.get("name", "")
+        for ds in APP_STATE["data_sources"]:
+            if target_name.lower() in ds["name"].lower():
+                ds["status"] = "Active"
+                APP_STATE["active_source_id"] = ds["id"]
+            else:
+                ds["status"] = "Previous"
+        return {"switchedTo": get_active_data_source()}
     elif tool_name == "get_optimization_results":
         recent_opts = [h for h in APP_STATE["history"] if h["type"] == "Optimization"]
-        return {"recentOptimizations": recent_opts[:3]}
-    elif tool_name == "propose_sheet_update":
-        return {
-            "action": "preview_required",
-            "message": f"Proposing update for {len(tool_args.get('changes', []))} row(s). Confirmation required.",
-            "changes": tool_args.get("changes", [])
-        }
-    elif tool_name == "get_connection_status":
-        return get_sanitized_connections()
+        return {"recentOptimizations": recent_opts[:3], "activeDataSource": active_ds["name"] if active_ds else "None"}
     else:
         return {"error": f"Unknown tool: {tool_name}"}
 
@@ -283,7 +489,6 @@ def execute_ai_tool(tool_name, tool_args):
 def ai_chat():
     data = request.json or {}
     message = data.get("message", "").strip()
-    conversation_id = data.get("conversationId", "default")
 
     if not message:
         return jsonify({"status": "error", "message": "Message is required"}), 400
@@ -292,60 +497,63 @@ def ai_chat():
     response_text = ""
     tool_calls = []
     preview_action = None
+    active_ds = get_active_data_source()
 
-    # Agentic Intent Analysis & Tool Invocation Architecture
-    if "optimization" in msg_lower or "result" in msg_lower or "waste" in msg_lower:
+    if "switch" in msg_lower and ("dataset" in msg_lower or "source" in msg_lower or "sheet" in msg_lower or "january" in msg_lower or "february" in msg_lower):
+        target = "january" if "january" in msg_lower else "february"
+        tool_res = execute_ai_tool("switch_active_data_source", {"name": target})
+        tool_calls.append({"tool": "switch_active_data_source", "result": tool_res})
+        new_active = tool_res.get("switchedTo", {})
+        response_text = (
+            f"PLAYX-AI has switched the active dataset to: **'{new_active.get('name')}'** ({new_active.get('type')}).\n\n"
+            f"All dashboard metrics, optimizer inputs, and AI contexts are now refreshed for this dataset."
+        )
+
+    elif "optimization" in msg_lower or "result" in msg_lower or "waste" in msg_lower:
         tool_res = execute_ai_tool("get_optimization_results", {})
         tool_calls.append({"tool": "get_optimization_results", "result": tool_res})
         response_text = (
-            f"Here is your waste optimization status:\n\n"
+            f"Here is your waste optimization status for active source **'{active_ds['name']}'**:\n\n"
             f"• **Recent Runs:** {len(tool_res['recentOptimizations'])} optimization job(s) logged.\n"
             f"• **Status:** Optimal material yield algorithm active.\n\n"
-            f"You can view complete 1D & 2D cut patterns on the **Waste Optimiser** dashboard."
+            f"You can view complete 1D & 2D cut patterns on the **Waste Optimiser** tab."
         )
 
-    elif "sheet" in msg_lower or "google" in msg_lower:
-        tool_res = execute_ai_tool("get_google_sheets", {})
-        tool_calls.append({"tool": "get_google_sheets", "result": tool_res})
+    elif "sheet" in msg_lower or "google" in msg_lower or "dataset" in msg_lower or "data" in msg_lower:
+        tool_res = execute_ai_tool("get_active_dataset", {})
+        tool_calls.append({"tool": "get_active_dataset", "result": tool_res})
 
         if "update" in msg_lower or "organize" in msg_lower or "change" in msg_lower:
             preview_changes = [
-                {"id": 1, "data": {"waste_est": "2.9%"}},
+                {"id": 1, "data": {"waste_est": "2.1%"}},
                 {"id": 2, "data": {"quantity": 35}}
             ]
             preview_action = {
                 "type": "google_sheets_update",
-                "title": "Google Sheets Update Proposed",
-                "description": "AI Agent proposes to update quantity & waste estimate in Google Sheets.",
+                "title": f"Update Dataset '{tool_res['name']}'",
+                "description": f"PLAYX-AI proposes updating quantity & waste estimates in '{tool_res['name']}'.",
                 "changes": preview_changes
             }
             response_text = (
-                f"I have inspected your sheet **'{tool_res['spreadsheet']}'** ({tool_res['activeWorksheet']}).\n\n"
-                f"I prepared a safety preview for the requested spreadsheet modification. Please confirm below to execute:"
+                f"PLAYX-AI inspected your active dataset **'{tool_res['name']}'** ({tool_res['type']}).\n\n"
+                f"A safety preview has been generated for the requested dataset modification. Confirm below to execute:"
             )
         else:
             response_text = (
-                f"Active Google Sheet: **'{tool_res['spreadsheet']}'** ({tool_res['activeWorksheet']})\n\n"
-                f"**Current Inventory Summary:**\n" +
+                f"Active Dataset: **'{tool_res['name']}'** ({tool_res['type']})\n\n"
+                f"**Current Inventory Summary ({tool_res['rowsCount']} items):**\n" +
                 "\n".join([f"• {r['material']}: {r['quantity']} units (Width: {r['width']})" for r in tool_res['rows']])
             )
-
-    elif "status" in msg_lower or "connection" in msg_lower or "services" in msg_lower:
-        tool_res = execute_ai_tool("get_connection_status", {})
-        tool_calls.append({"tool": "get_connection_status", "result": tool_res})
-        response_text = "Here is your current connection status across configured integrations:\n\n"
-        for s_name, s_info in tool_res.items():
-            icon = "🟢" if s_info.get("status") == "Connected" else "⚪"
-            response_text += f"• **{s_name.replace('_', ' ').title()}**: {icon} {s_info.get('status')}\n"
 
     else:
         response_text = (
             f"Hello! I am **PLAYX-AI**.\n\n"
+            f"Active Data Source: **'{active_ds['name']}'** ({active_ds['type']})\n\n"
             f"PLAYX-AI can assist you with:\n"
             f"1. **Running 1D & 2D waste optimization** algorithms\n"
-            f"2. **Inspecting and safe-updating Google Sheets** data\n"
-            f"3. **Analyzing waste reduction performance & metrics**\n"
-            f"4. **Managing integrations** (Gemini API, Supabase, Google Sheets)\n\n"
+            f"2. **Switching & managing datasets** (Google Sheets, Excel files)\n"
+            f"3. **Inspecting and safe-updating Google Sheets** data\n"
+            f"4. **Analyzing waste reduction performance & metrics**\n\n"
             f"How can PLAYX-AI help with your waste management workflow today?"
         )
 
