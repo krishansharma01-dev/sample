@@ -340,16 +340,16 @@ def ai_chat():
 
     else:
         response_text = (
-            f"Hello! I am your **PLAYX Waste Optimiser AI Assistant**.\n\n"
-            f"I can assist you with:\n"
+            f"Hello! I am **PLAYX-AI**.\n\n"
+            f"PLAYX-AI can assist you with:\n"
             f"1. **Running 1D & 2D waste optimization** algorithms\n"
             f"2. **Inspecting and safe-updating Google Sheets** data\n"
             f"3. **Analyzing waste reduction performance & metrics**\n"
             f"4. **Managing integrations** (Gemini API, Supabase, Google Sheets)\n\n"
-            f"How can I help with your waste management workflow today?"
+            f"How can PLAYX-AI help with your waste management workflow today?"
         )
 
-    add_history("AI Assistant", "AI Chat Query Processed", f"User query: '{message[:40]}...'")
+    add_history("PLAYX-AI", "AI Chat Query Processed", f"User query: '{message[:40]}...'")
 
     return jsonify({
         "status": "success",

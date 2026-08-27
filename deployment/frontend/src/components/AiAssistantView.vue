@@ -2,10 +2,18 @@
   <div class="ai-assistant-view apple-card">
     <div class="chat-header">
       <div class="header-info">
-        <span class="ai-icon">🤖</span>
+        <div class="ai-icon-bg">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+            <circle cx="12" cy="5" r="2"></circle>
+            <path d="M12 7v4"></path>
+            <line x1="8" y1="16" x2="8.01" y2="16"></line>
+            <line x1="16" y1="16" x2="16.01" y2="16"></line>
+          </svg>
+        </div>
         <div>
-          <h2>PLAYX AI Assistant</h2>
-          <span class="status-indicator">🟢 Agentic Engine Active</span>
+          <h2>PLAYX-AI</h2>
+          <span class="status-indicator">🟢 Agentic Engine Operational</span>
         </div>
       </div>
       <button class="apple-btn apple-btn-outline" @click="clearChat">Clear Chat</button>
@@ -13,9 +21,12 @@
 
     <div class="messages-container" ref="msgContainer">
       <div v-for="(msg, index) in messages" :key="index" :class="['message-row', msg.sender]">
-        <div class="avatar">{{ msg.sender === 'user' ? '👤' : '🤖' }}</div>
+        <div class="avatar">
+          <svg v-if="msg.sender === 'user'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path></svg>
+        </div>
         <div class="bubble apple-card">
-          <div class="sender-name">{{ msg.sender === 'user' ? 'You' : 'PLAYX AI Assistant' }}</div>
+          <div class="sender-name">{{ msg.sender === 'user' ? 'You' : 'PLAYX-AI' }}</div>
           <div class="message-text" v-html="formatMarkdown(msg.text)"></div>
 
           <div v-if="msg.previewAction" class="action-preview-box">
@@ -35,9 +46,11 @@
       </div>
 
       <div v-if="loading" class="message-row ai">
-        <div class="avatar">🤖</div>
+        <div class="avatar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle></svg>
+        </div>
         <div class="bubble apple-card">
-          <span class="typing-indicator">AI is thinking & analyzing tools...</span>
+          <span class="typing-indicator">PLAYX-AI is processing query & tools...</span>
         </div>
       </div>
     </div>
@@ -46,7 +59,7 @@
       <input
         v-model="inputMsg"
         type="text"
-        placeholder="Ask AI to optimize waste, check Google Sheets, or run tasks..."
+        placeholder="Ask PLAYX-AI to optimize waste, check Google Sheets, or run tasks..."
         class="apple-input"
         @keyup.enter="sendMessage"
       />
@@ -69,7 +82,7 @@ export default {
       messages: [
         {
           sender: "ai",
-          text: "Hello! I am your **PLAYX AI Assistant**.\n\nAsk me to summarize current waste results, inspect your Google Sheet, or execute optimizations safely."
+          text: "Hello! I am **PLAYX-AI**.\n\nAsk PLAYX-AI to summarize waste results, inspect your Google Sheet, or execute optimizations safely."
         }
       ]
     };
@@ -104,7 +117,7 @@ export default {
       } catch (err) {
         this.messages.push({
           sender: "ai",
-          text: "⚠️ System connection error. Ensure local backend is running."
+          text: "⚠️ Backend connection error. Ensure server is active."
         });
       } finally {
         this.loading = false;
@@ -120,7 +133,7 @@ export default {
         });
         this.messages.push({
           sender: "ai",
-          text: `✅ **Action Confirmed & Executed!**\n\n${res.data.message}`
+          text: `✅ **Action Confirmed & Executed by PLAYX-AI!**\n\n${res.data.message}`
         });
       } catch (e) {
         this.messages.push({ sender: "ai", text: "❌ Failed to execute action." });
@@ -137,7 +150,7 @@ export default {
       this.messages = [
         {
           sender: "ai",
-          text: "Chat history cleared. How can I assist you?"
+          text: "Chat history cleared. How can PLAYX-AI assist you?"
         }
       ];
     },
@@ -156,7 +169,7 @@ export default {
 .ai-assistant-view {
   display: flex;
   flex-direction: column;
-  height: Calc(100vh - 120px);
+  height: calc(100vh - 120px);
   padding: 20px;
 }
 
@@ -172,6 +185,15 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.ai-icon-bg {
+  background: #0071e3;
+  color: #fff;
+  padding: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
 }
 
 .header-info h2 {
@@ -206,7 +228,19 @@ export default {
 }
 
 .avatar {
-  font-size: 1.5rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 36px;
+}
+
+.message-row.user .avatar {
+  background: #0071e3;
+  color: #ffffff;
 }
 
 .bubble {

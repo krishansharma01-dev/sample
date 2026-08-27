@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "deployment/server.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "deployment/frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "deployment/server.py"
+    },
+    {
+      "src": "/stocks_(.*)",
+      "dest": "deployment/server.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "deployment/frontend/$1"
+    }
+  ]
+}

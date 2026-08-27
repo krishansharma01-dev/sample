@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" @contextmenu="preventContextMenu">
     <!-- Mobile Hamburger Toggle -->
     <button class="mobile-menu-toggle" @click="isMobileOpen = !isMobileOpen">
       ☰ Menu
@@ -27,53 +27,60 @@
       </header>
 
       <div class="view-container">
-        <DashboardView
-          v-if="currentTab === 'dashboard'"
-          :dashboardData="dashboardData"
-          @navigate="currentTab = $event"
-        />
+        <transition name="page-fade" mode="out-in">
+          <DashboardView
+            v-if="currentTab === 'dashboard'"
+            :key="'dashboard'"
+            :dashboardData="dashboardData"
+            @navigate="currentTab = $event"
+          />
 
-        <CspTool v-else-if="currentTab === 'optimiser'" />
+          <CspTool v-else-if="currentTab === 'optimiser'" :key="'optimiser'" />
 
-        <GenericModuleView
-          v-else-if="currentTab === 'projects'"
-          title="Projects / Operations"
-          subtitle="Manage active production batches and cutting operations."
-          :items="dashboardData.projects"
-        />
+          <GenericModuleView
+            v-else-if="currentTab === 'projects'"
+            :key="'projects'"
+            title="Projects / Operations"
+            subtitle="Manage active production batches and cutting operations."
+            :items="dashboardData.projects"
+          />
 
-        <GenericModuleView
-          v-else-if="currentTab === 'data'"
-          title="Data Center"
-          subtitle="Raw material specifications, master dimensions, and inventory logs."
-          :items="[
-            { title: 'Aluminum 6061 Stock List', details: '150 items in inventory' },
-            { title: 'Steel Pipe Batch #22', details: '95 items in inventory' }
-          ]"
-        />
+          <GenericModuleView
+            v-else-if="currentTab === 'data'"
+            :key="'data'"
+            title="Data Center"
+            subtitle="Raw material specifications, master dimensions, and inventory logs."
+            :items="[
+              { title: 'Aluminum 6061 Stock List', details: '150 items in inventory' },
+              { title: 'Steel Pipe Batch #22', details: '95 items in inventory' }
+            ]"
+          />
 
-        <GoogleSheetsView v-else-if="currentTab === 'sheets'" />
+          <GoogleSheetsView v-else-if="currentTab === 'sheets'" :key="'sheets'" />
 
-        <AiAssistantView v-else-if="currentTab === 'ai-assistant'" />
+          <AiAssistantView v-else-if="currentTab === 'ai-assistant'" :key="'ai-assistant'" />
 
-        <GenericModuleView
-          v-else-if="currentTab === 'reports'"
-          title="Reports & Analytics"
-          subtitle="Waste summary metrics and yield optimization reports."
-          :items="[
-            { title: 'Monthly Waste Summary', details: '18.4% total yield improvement achieved.' },
-            { title: 'Material Utilization Log', details: 'Generated on ' + new Date().toLocaleDateString() }
-          ]"
-        />
+          <GenericModuleView
+            v-else-if="currentTab === 'reports'"
+            :key="'reports'"
+            title="Reports & Analytics"
+            subtitle="Waste summary metrics and yield optimization reports."
+            :items="[
+              { title: 'Monthly Waste Summary', details: '18.4% total yield improvement achieved.' },
+              { title: 'Material Utilization Log', details: 'Generated on ' + new Date().toLocaleDateString() }
+            ]"
+          />
 
-        <GenericModuleView
-          v-else-if="currentTab === 'history'"
-          title="Activity History"
-          subtitle="System logs, optimization runs, and service sync history."
-          :items="dashboardData.recentHistory"
-        />
+          <GenericModuleView
+            v-else-if="currentTab === 'history'"
+            :key="'history'"
+            title="Activity History"
+            subtitle="System logs, optimization runs, and service sync history."
+            :items="dashboardData.recentHistory"
+          />
 
-        <SettingsView v-else-if="currentTab === 'settings'" />
+          <SettingsView v-else-if="currentTab === 'settings'" :key="'settings'" />
+        </transition>
       </div>
     </main>
   </div>
@@ -115,7 +122,7 @@ export default {
         projects: "Projects / Operations",
         data: "Data Center",
         sheets: "Google Sheets",
-        "ai-assistant": "AI Assistant",
+        "ai-assistant": "PLAYX-AI Assistant",
         reports: "Reports",
         history: "History",
         settings: "Settings"
@@ -136,6 +143,10 @@ export default {
       } catch (err) {
         console.error("Failed to load dashboard metrics", err);
       }
+    },
+    preventContextMenu(e) {
+      // Client-side light right-click context menu deterrence
+      e.preventDefault();
     }
   }
 };
@@ -209,6 +220,22 @@ export default {
 .view-container {
   padding: 24px 32px;
   flex: 1;
+}
+
+/* Page Transition Animations */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 @media (max-width: 991px) {
