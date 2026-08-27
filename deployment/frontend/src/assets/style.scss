@@ -1,44 +1,194 @@
+/* Apple-Inspired Premium SaaS Design System for PLAYX Waste Optimiser */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+:root {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --bg-primary: #f5f5f7;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card-solid: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.75);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 122, 255, 0.3);
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #a1a1a6;
+  --accent-blue: #0071e3;
+  --accent-blue-hover: #0077ed;
+  --accent-green: #34c759;
+  --accent-orange: #ff9500;
+  --accent-red: #ff3b30;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  --transition-fast: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 body {
-  /* font-size: 0.9em; */
-  background-color: #ecf0f1;
-}
-
-.btn {
-  padding: 2px 8px;
-}
-
-input {
-  border: 0px solid #000;
+  font-family: var(--font-family);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   margin: 0;
-  background: transparent;
-  width: 100%;
-}
-table tr td {
-  border-right: 1px solid #000;
-  border-bottom: 1px solid #000;
-}
-table {
-  background: #fff none repeat scroll 0 0;
-  border-left: 1px solid #000;
-  border-top: 1px solid #000;
-}
-table tr:nth-child(even) {
-  background: #95a5a6;
-}
-table tr:nth-child(odd) {
-  background: #bdc3c7;
-}
-.active {
-  font-weight: bold;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.information {
-  border-radius: 100%;
-  background: #444;
-  color: white;
-  padding: 2px 5px;
-  font-size: 80%;
-  font-weight: bold;
+/* Glassmorphism Card Style */
+.apple-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-normal);
+  overflow: hidden;
+}
+
+.apple-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Button Styling */
+.apple-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-decoration: none;
+}
+
+.apple-btn-primary {
+  background-color: var(--accent-blue);
+  color: #ffffff;
+}
+
+.apple-btn-primary:hover {
+  background-color: var(--accent-blue-hover);
+  transform: translateY(-1px);
+}
+
+.apple-btn-secondary {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+.apple-btn-secondary:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.apple-btn-outline {
+  border-color: var(--border-color);
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.apple-btn-outline:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* Form inputs */
+.apple-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.8);
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  transition: var(--transition-fast);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.apple-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+  background: #ffffff;
+}
+
+/* Glowing & Bouncing Button for PLAYXCODE Website CTA */
+@keyframes glowingBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 12px rgba(0, 113, 227, 0.5), 0 0 24px rgba(52, 199, 89, 0.3);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 0 20px rgba(0, 113, 227, 0.8), 0 0 35px rgba(52, 199, 89, 0.6);
+  }
+}
+
+.glowing-cta-btn {
+  background: linear-gradient(135deg, #0071e3 0%, #34c759 100%);
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 12px 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  animation: glowingBounce 2.5s infinite ease-in-out;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glowing-cta-btn:hover {
+  animation-play-state: paused;
+  transform: scale(1.06) translateY(-2px);
+  box-shadow: 0 0 25px rgba(0, 113, 227, 0.9), 0 0 40px rgba(52, 199, 89, 0.8);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .glowing-cta-btn {
+    animation: none !important;
+  }
+}
+
+/* Utility badge */
+.badge-status {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-success {
+  background: rgba(52, 199, 89, 0.15);
+  color: #248a3d;
+}
+
+.badge-neutral {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
+}
+
+.badge-warning {
+  background: rgba(255, 149, 0, 0.15);
+  color: #c67300;
 }
